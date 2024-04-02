@@ -1,14 +1,11 @@
-﻿@* @inject IConfiguration config *@
+﻿@page "/"
 
+@using blazorServerSK.Data
+@inject SentimentAndThemeService SentimentAndTheme
 @using MiniExcelLibs
 @using System.IO
 @using System.Linq
 @using System
-
-@page "/"
-
-
-
 
 <PageTitle>File Upload App</PageTitle>
 
@@ -24,13 +21,39 @@
             <li>@error</li>
         }
     </ul>
+} else if (sentimentAndThemeList.Count > 0)
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Number</th>
+                <th>Comment</th>
+                <th>Sentiment</th>
+                <th>Theme</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var sentimentAndTheme in sentimentAndThemeList)
+            {
+                <tr>
+                    <td>@sentimentAndTheme.Id</td>
+                    <td>@sentimentAndTheme.Comment</td>
+                    <td>@sentimentAndTheme.Sentiment</td>
+                    <td>@sentimentAndTheme.Theme</td>
+                </tr>
+            }
+        </tbody>
+    </table>
 }
+
 @code {
     private long maxFileSize = 10 * 1024 * 1024; // 10MB
     private int maxAllowedFiles = 3;
     private List<string> errors = new List<string>();
+    List<SentimentAndTheme> sentimentAndThemeList = new List<SentimentAndTheme>();
     private async Task LoadFiles(InputFileChangeEventArgs e)
     {
+        
         try
         {
             errors.Clear();
@@ -55,10 +78,16 @@
                         await stream.CopyToAsync(fs);
                     }
 
+                    var intBatchSize = 10;
                     var rows = MiniExcel.Query<SurveyFeedback>(tempFilePath).ToList();
+                    var iterationCnt=0;
                     foreach (var row in rows)
                     {
-                        Console.WriteLine($"Id: {row.Id}, Comment: {row.Comments}");
+                        var commentRows = rows.Skip(iterationCnt * intBatchSize).Take(intBatchSize).ToList();
+                        var resultsSentimentList = await SentimentAndTheme.GetSentimentAsync(commentRows);
+                        sentimentAndThemeList.AddRange(resultsSentimentList);
+                        iterationCnt++;
+                        
                     }
                 }
             }
@@ -73,7 +102,7 @@
     public class SurveyFeedback
     {
         public int Id { get; set; }
-        public string Comments { get; set; }
+        public string? Comments { get; set; }
     }
 
 }
