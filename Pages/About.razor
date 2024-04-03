@@ -1,0 +1,20 @@
+@page "/about"
+
+<PageTitle>About: Sentiment and Theme Analysis</PageTitle>
+<div>
+    <p>
+        This sample demonstrates how to perform sentiment and theme analysis on a list of comments. The comments are read from an Excel file and processed in batches of 50 records. The sentiment and theme analysis is performed using <a href="https://aka.ms/azureopenai">Azure OpenAI</A> and the <a href="https://learn.microsoft.com/en-us/semantic-kernel/overview/">Semantic Kernel.</a> 
+    </p>
+    <p>
+        To get started, upload an Excel file containing the comments you want to analyze. The comments should be in a column named "Comments".
+    </p>
+    <p>
+        The results of the analysis are displayed in a table with the following columns:
+    </p>
+    <ul>
+        <li>Number: The record number of the comment.</li>
+        <li>Comment: The text of the comment.</li>
+        <li>Sentiment: The sentiment of the comment (positive, negative, or neutral).</li>
+        <li>Theme: The theme of the comment (e.g. customer service, product quality, etc.).</li>
+    </ul>
+</div>

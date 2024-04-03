@@ -2,16 +2,34 @@
 
 @using blazorServerSK.Data
 @inject SentimentAndThemeService SentimentAndTheme
+@inject IJSRuntime JS
 @using MiniExcelLibs
 @using System.IO
 @using System.Linq
 @using System
 
-<PageTitle>File Upload App</PageTitle>
+<PageTitle>Sentiment and Theme Analysis - Microsoft Semantic Kernel Sample</PageTitle>
+<h1>Sentiment and Theme Analysis</h1>
 
-<h1>File Upload</h1>
+<InputFile OnChange="@LoadFiles" accept=".xls,.xlsx,.cvs" class="btn btn-primary" />
+<p>
+</p>
+<div style=' display: @(canSave ? "block" : "none")'>
+    <p></p>
+    <button @onclick="SaveResults" class="btn btn-primary" id="btnSaveResults">Save Results</button>
 
-<InputFile OnChange="@LoadFiles" multiple accept=".xls,.xlsx,.cvs" />
+
+</div>
+@if (status.Count > 0)
+{
+    <h2>Status</h2>
+    <ul>
+        @foreach (var stat in status)
+        {
+            <li>@stat</li>
+        }
+    </ul>
+}
 @if (errors.Count > 0)
 {
     <h2>Errors</h2>
@@ -21,7 +39,8 @@
             <li>@error</li>
         }
     </ul>
-} else if (sentimentAndThemeList.Count > 0)
+}
+else if (sentimentAndThemeList.Count > 0)
 {
     <table class="table">
         <thead>
@@ -45,18 +64,21 @@
         </tbody>
     </table>
 }
-
 @code {
     private long maxFileSize = 10 * 1024 * 1024; // 10MB
     private int maxAllowedFiles = 3;
     private List<string> errors = new List<string>();
+    private List<string> status = new List<string>();
     List<SentimentAndTheme> sentimentAndThemeList = new List<SentimentAndTheme>();
+
+    private bool canSave { get; set; } = false;
     private async Task LoadFiles(InputFileChangeEventArgs e)
     {
-        
         try
         {
             errors.Clear();
+            sentimentAndThemeList.Clear();
+            canSave = false;
             var files = e.GetMultipleFiles(maxAllowedFiles);
             if (files.Count > maxAllowedFiles)
             {
@@ -71,25 +93,42 @@
                 }
                 else
                 {
-                    string tempFilePath = "C:\\temp\\" + Guid.NewGuid().ToString() + ".xlsx";  
+                    string tempFilePath = "C:\\temp\\" + Guid.NewGuid().ToString() + ".xlsx";
                     await using (var stream = file.OpenReadStream())
                     {
                         await using FileStream fs = new FileStream(tempFilePath, FileMode.Create);
                         await stream.CopyToAsync(fs);
                     }
 
-                    var intBatchSize = 10;
+                    var intBatchSize = 50;
                     var rows = MiniExcel.Query<SurveyFeedback>(tempFilePath).ToList();
-                    var iterationCnt=0;
+                    var iterationCnt = 0;
                     foreach (var row in rows)
                     {
                         var commentRows = rows.Skip(iterationCnt * intBatchSize).Take(intBatchSize).ToList();
+                        if ((iterationCnt * intBatchSize) % intBatchSize == 0)
+                        {
+                            status.Clear();
+                            var maxRecs = commentRows.Count < intBatchSize ? commentRows.Count : intBatchSize;
+                            status.Add($"Processing records {iterationCnt * intBatchSize} to {(iterationCnt * intBatchSize) + maxRecs}...");
+                            StateHasChanged();
+                        }
+                        if (commentRows.Count == 0)
+                        {
+                            break;
+                        }
                         var resultsSentimentList = await SentimentAndTheme.GetSentimentAsync(commentRows);
                         sentimentAndThemeList.AddRange(resultsSentimentList);
+                        StateHasChanged();
                         iterationCnt++;
-                        
+
                     }
                 }
+                status.Clear();
+                status.Add($"File {file.Name} was processed successfully.");
+                canSave = true;
+                StateHasChanged();
+
             }
         }
         catch (Exception ex)
@@ -103,6 +142,21 @@
     {
         public int Id { get; set; }
         public string? Comments { get; set; }
+    }
+    private void SaveResults()
+    {
+        try
+        {
+            var filePath = "C:\\temp\\" + Guid.NewGuid().ToString() + ".xlsx";
+            var data = sentimentAndThemeList.Select(x => new { x.Id, x.Comment, x.Sentiment, x.Theme }).ToList();
+            MiniExcel.SaveAs(filePath, data);
+            status.Clear();
+            status.Add($"Results saved to {filePath}");
+        }
+        catch (Exception ex)
+        {
+            errors.Add($"Error: {ex.Message}");
+        }
     }
 
 }
